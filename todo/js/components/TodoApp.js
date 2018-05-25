@@ -10,27 +10,20 @@
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-import AddTodoMutation from '../mutations/AddTodoMutation';
 import TodoList from './TodoList';
-import TodoListFooter from './TodoListFooter';
-import TodoTextInput from './TodoTextInput';
 
 import React from 'react';
 import {
-  createFragmentContainer,
+  createRefetchContainer,
   graphql,
 } from 'react-relay';
 
 class TodoApp extends React.Component {
-  _handleTextInputSave = (text) => {
-    AddTodoMutation.commit(
-      this.props.relay.environment,
-      text,
-      this.props.viewer,
-    );
-  };
   render() {
-    const hasTodos = this.props.viewer.totalCount > 0;
+    const {viewer: {todos: {edges, pageInfo}}} = this.props;
+
+    console.dir(edges);
+
     return (
       <div>
         <section className="todoapp">
@@ -38,46 +31,58 @@ class TodoApp extends React.Component {
             <h1>
               todos
             </h1>
-            <TodoTextInput
-              autoFocus={true}
-              className="new-todo"
-              onSave={this._handleTextInputSave}
-              placeholder="What needs to be done?"
-            />
           </header>
-          <TodoList viewer={this.props.viewer} />
-          {hasTodos &&
-            <TodoListFooter
-              todos={this.props.viewer.todos}
-              viewer={this.props.viewer}
-            />
-          }
+          <TodoList
+            todos={edges}/>
         </section>
-        <footer className="info">
-          <p>
-            Double-click to edit a todo
-          </p>
-          <p>
-            Created by the <a href="https://facebook.github.io/relay/">
-              Relay team
-            </a>
-          </p>
-          <p>
-            Part of <a href="http://todomvc.com">TodoMVC</a>
-          </p>
+        <footer>
+          {pageInfo.hasNextPage &&
+            <button
+              className="clear-completed"
+              title="Load More"
+              onClick={this.onLoadMore}>
+              Load More
+            </button>
+          }
         </footer>
       </div>
     );
   }
+
+  onLoadMore = () => this.props.relay.refetch(fragmentVariables => {
+    const {viewer: {todos: {pageInfo}}} = this.props;
+
+    return {
+      first: fragmentVariables.first,
+      after: pageInfo.endCursor,
+      //orderBy: fragmentVariables.orderBy === 'desc' ? 'asc' : 'desc'
+    };
+  });
 }
 
-export default createFragmentContainer(TodoApp, {
-  viewer: graphql`
-    fragment TodoApp_viewer on User {
-      id,
-      totalCount,
-      ...TodoListFooter_viewer,
-      ...TodoList_viewer,
+export default createRefetchContainer(
+  TodoApp,
+  graphql`
+    fragment TodoApp_viewer on Viewer
+    @argumentDefinitions(first: {type: "Int"}, after: {type: "String"}, orderBy: {type: "OrderBy"}) {
+      id
+      todos(first: $first, after: $after, orderBy: $orderBy) @connection(key: "TodoApp_todos", filters: []) {
+        edges {
+          cursor
+          ...TodoList_todos
+        }
+        pageInfo {
+          hasNextPage
+          endCursor
+        }
+      }
     }
   `,
-});
+  graphql`
+    query TodoAppRefetchQuery($first: Int, $after: String, $orderBy: OrderBy) {
+      viewer {
+        ...TodoApp_viewer @arguments(first: $first, after: $after, orderBy: $orderBy)
+      }
+    }
+  `
+);

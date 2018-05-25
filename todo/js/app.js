@@ -55,13 +55,17 @@ ReactDOM.render(
   <QueryRenderer
     environment={modernEnvironment}
     query={graphql`
-      query appQuery {
+      query appQuery($first: Int, $after: String, $orderBy: OrderBy) {
         viewer {
-          ...TodoApp_viewer
+          ...TodoApp_viewer @arguments(first: $first, after: $after, orderBy: $orderBy)
         }
       }
     `}
-    variables={{}}
+    variables={{
+      first: 10,
+      after: null,
+      orderBy: 'asc'
+    }}
     render={({error, props}) => {
       if (props) {
         return <TodoApp viewer={props.viewer} />;

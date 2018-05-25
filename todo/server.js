@@ -30,7 +30,7 @@ const compiler = webpack({
     rules: [
       {
         test: /\.js$/,
-        exclude: /\/node_modules\//,
+		    include: [path.resolve(__dirname, './js')],
         use: {
           loader: 'babel-loader',
         }
